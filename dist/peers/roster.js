@@ -31,7 +31,7 @@ export function buildPeersNote(ownName, peers, mode) {
     const how = mode === 'hub'
         ? '`peer_send` to="<name>" delivers a real prompt there; reply arrives here as a peer message. Native `hub` op=send is best-effort only. `peer_status` and `peer_request` are available agent tools.'
         : '`peer_send` to="<name>" delivers a real prompt there; reply arrives here as a peer message. `peer_status` and `peer_request` are available agent tools.';
-    const naming = 'Names are session names (`/rename <name>`); valid 1-24 [a-zA-Z0-9_.-], else `<dir>-<pid>`. Auto-titles never qualify — `/rename` to claim an address.';
+    const naming = 'Names are session names (`/rename <name>`); valid 1-24 [a-zA-Z0-9_.-] used as-is, other titles (incl. auto-titles) slugged, e.g. `merge-reconcile-origin`; else `<dir>-<pid>`.';
     return [`<peers>`, `You are \`${ownName}\`. ${contact}`, what, how, naming, '', rows, `</peers>`].join('\n');
 }
 /**

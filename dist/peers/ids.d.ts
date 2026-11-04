@@ -17,14 +17,17 @@ export declare function validatePeerName(name: string, opts?: {
 /** Default address for an instance: sanitized `<basename(cwd)>-<pid>`. */
 export declare function defaultPeerName(cwd: string, pid: number): string;
 /**
- * Derive a peer address from the host session name. A session name qualifies
- * as an address ONLY in raw form: non-empty, matching
- * {@link PEER_NAME_PATTERN} (1-24 of a-z A-Z 0-9 _ . -), and not the refused
- * host name `Main`. Anything else falls back to {@link defaultPeerName} with
- * `rejected` carrying the raw name so the caller can warn once — except
- * model-generated titles (`titleSource` `"auto"`), which fall back silently:
- * they express no user intent and the host rewrites them. Cross-process
- * collisions still resolve later via {@link resolvePeerName}.
+ * Slug a free-form session title into an address: drops the omp 18.9 title
+ * card icon, lowercases, joins words with `-`, and cuts at a word boundary
+ * within 24 chars. `🔀 MERGE: Reconcile origin master` → `merge-reconcile-origin`.
+ */
+export declare function slugifySessionTitle(raw: string): string | undefined;
+/**
+ * Derive a peer address from the host session name. A valid raw name is used
+ * as-is; any other name (including omp's generated card titles) is slugged by
+ * {@link slugifySessionTitle}. Only an unsluggable name falls back to
+ * {@link defaultPeerName}, with `rejected` set so the caller can warn once —
+ * silently for `"auto"` titles. Collisions resolve later via {@link resolvePeerName}.
  */
 export declare function peerNameFromSession(raw: string | undefined, cwd: string, pid: number, opts?: {
     titleSource?: string;

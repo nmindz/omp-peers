@@ -37,6 +37,7 @@ const {
   listLivePeers,
   removePeerRecord,
   peerNameFromSession,
+  slugifySessionTitle,
   readTitleSource,
   buildPeersNote,
   appendNoteToMessages,
@@ -664,10 +665,11 @@ describe('peer identity: validation, collision, session-name adoption', () => {
     assert.ok(name.endsWith('-12345678'));
   });
 
-  it('adopts a raw valid session name and falls back otherwise', () => {
+  it('adopts a raw valid session name, slugs titles, falls back otherwise', () => {
     assert.deepEqual(peerNameFromSession('backend', '/work/proj', 5), { name: 'backend' });
-    const rejected = peerNameFromSession('My Agent', '/work/proj', 5);
-    assert.equal(rejected.rejected, 'My Agent');
+    assert.deepEqual(peerNameFromSession('My Agent', '/work/proj', 5), { name: 'my-agent' });
+    const rejected = peerNameFromSession('🔥 ✨', '/work/proj', 5);
+    assert.equal(rejected.rejected, '🔥 ✨');
     assert.equal(rejected.name, defaultPeerName('/work/proj', 5));
     assert.deepEqual(peerNameFromSession('', '/work/proj', 5), {
       name: defaultPeerName('/work/proj', 5),
@@ -677,18 +679,20 @@ describe('peer identity: validation, collision, session-name adoption', () => {
     });
   });
 
-  it('ignores model-generated auto-titles silently', () => {
-    assert.deepEqual(
-      peerNameFromSession('Can you contact peers independently', '/work/proj', 5, { titleSource: 'auto' }),
-      { name: defaultPeerName('/work/proj', 5) }
-    );
-    // Even a valid-looking auto-title never claims the address.
-    assert.deepEqual(peerNameFromSession('backend', '/work/proj', 5, { titleSource: 'auto' }), {
+  it('slugs omp title cards from either source within 24 chars', () => {
+    for (const titleSource of ['auto', 'user']) {
+      assert.deepEqual(
+        peerNameFromSession('🔀 MERGE: Reconcile origin master pull conflicts', '/work/proj', 5, { titleSource }),
+        { name: 'merge-reconcile-origin' }
+      );
+    }
+    assert.deepEqual(peerNameFromSession('backend', '/work/proj', 5, { titleSource: 'auto' }), { name: 'backend' });
+    assert.equal(slugifySessionTitle('Supercalifragilisticexpialidocious word'), 'supercalifragilisticexpi');
+    assert.equal(slugifySessionTitle('🏷️ NAME: Find session auto-naming plugin'), 'name-find-session-auto');
+    // Unsluggable auto-titles fall back silently.
+    assert.deepEqual(peerNameFromSession('🔥', '/work/proj', 5, { titleSource: 'auto' }), {
       name: defaultPeerName('/work/proj', 5),
     });
-    // Explicit user names keep legacy adopt-or-warn behavior.
-    assert.deepEqual(peerNameFromSession('backend', '/work/proj', 5, { titleSource: 'user' }), { name: 'backend' });
-    assert.equal(peerNameFromSession('My Agent', '/work/proj', 5, { titleSource: 'user' }).rejected, 'My Agent');
   });
 
   it('refuses the host name Main as a peer address', () => {
@@ -743,27 +747,27 @@ describe('peer name follows the host session name (tick level)', () => {
     const adopted = await waitForOwnBeat('test-peer');
     assert.equal(adopted.name, 'test-peer');
 
-    sessionName = 'Fix the login bug later';
+    sessionName = '🔥 ✨';
     sessionId = 'sess-tick-2';
     handlers['session_switch'](undefined, fakeCtx);
     const fallback = defaultPeerName(join(STATE, 'tickproj'), process.pid);
     const rejectedBeat = await waitForOwnBeat(fallback);
     assert.equal(rejectedBeat.name, fallback);
     assert.equal(noted.length, 1);
-    assert.match(noted[0].message, /Fix the login bug later/);
+    assert.match(noted[0].message, /🔥 ✨/);
     assert.match(noted[0].message, /\/rename/);
 
     sessionId = 'sess-tick-3';
     handlers['session_switch'](undefined, fakeCtx);
     await waitForOwnBeat(fallback);
     assert.equal(noted.length, 1, 'no repeat notify for the same rejected name');
-    sessionName = 'Add deepseek-harness retro checks';
+    sessionName = '🌀';
     sessionId = 'sess-tick-4';
     handlers['session_switch'](undefined, fakeCtx);
-    for (let i = 0; i < 100 && !logged.some((m) => m.includes('Add deepseek-harness retro checks')); i += 1) {
+    for (let i = 0; i < 100 && !logged.some((m) => m.includes('🌀')); i += 1) {
       await new Promise((resolve) => setTimeout(resolve, 25));
     }
-    assert.ok(logged.some((m) => m.includes('Add deepseek-harness retro checks')), 'second rejection logs instead of popping up');
+    assert.ok(logged.some((m) => m.includes('🌀')), 'second rejection logs instead of popping up');
     assert.equal(noted.length, 1, 'no second popup for a new auto-title; later ones log only');
 
     handlers['session_shutdown']();

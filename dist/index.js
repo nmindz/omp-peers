@@ -9,7 +9,7 @@
 export { resolveStateDir, ensureStateDirs, peersDir, peerPath, } from './store/paths.js';
 export { durableWriteJson, readJsonFile, } from './store/atomic.js';
 // Peer identity.
-export { PEER_NAME_PATTERN, isValidPeerName, validatePeerName, defaultPeerName, peerNameFromSession, resolvePeerName, } from './peers/ids.js';
+export { PEER_NAME_PATTERN, isValidPeerName, validatePeerName, defaultPeerName, peerNameFromSession, slugifySessionTitle, resolvePeerName, } from './peers/ids.js';
 // Presence.
 export { writePeerBeat, listLivePeers, removePeerRecord, startPresenceBeat, formatBeatAge, HEARTBEAT_MS, PEER_TTL_MS, } from './peers/presence.js';
 // Transport.

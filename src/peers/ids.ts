@@ -61,14 +61,34 @@ export function defaultPeerName(cwd: string, pid: number): string {
 }
 
 /**
- * Derive a peer address from the host session name. A session name qualifies
- * as an address ONLY in raw form: non-empty, matching
- * {@link PEER_NAME_PATTERN} (1-24 of a-z A-Z 0-9 _ . -), and not the refused
- * host name `Main`. Anything else falls back to {@link defaultPeerName} with
- * `rejected` carrying the raw name so the caller can warn once — except
- * model-generated titles (`titleSource` `"auto"`), which fall back silently:
- * they express no user intent and the host rewrites them. Cross-process
- * collisions still resolve later via {@link resolvePeerName}.
+ * Slug a free-form session title into an address: drops the omp 18.9 title
+ * card icon, lowercases, joins words with `-`, and cuts at a word boundary
+ * within 24 chars. `🔀 MERGE: Reconcile origin master` → `merge-reconcile-origin`.
+ */
+export function slugifySessionTitle(raw: string): string | undefined {
+  const words = raw
+    .normalize('NFKD')
+    .toLowerCase()
+    .replace(/[^a-z0-9_.]+/g, ' ')
+    .trim()
+    .split(/\s+/)
+    .filter((w) => w !== '' && !/^\.+$/.test(w));
+  let out = '';
+  for (const word of words) {
+    const next = out === '' ? word : `${out}-${word}`;
+    if (next.length > 24) break;
+    out = next;
+  }
+  if (out === '' && words[0] !== undefined) out = words[0].slice(0, 24);
+  return out !== '' && isValidPeerName(out) ? out : undefined;
+}
+
+/**
+ * Derive a peer address from the host session name. A valid raw name is used
+ * as-is; any other name (including omp's generated card titles) is slugged by
+ * {@link slugifySessionTitle}. Only an unsluggable name falls back to
+ * {@link defaultPeerName}, with `rejected` set so the caller can warn once —
+ * silently for `"auto"` titles. Collisions resolve later via {@link resolvePeerName}.
  */
 export function peerNameFromSession(
   raw: string | undefined,
@@ -76,16 +96,13 @@ export function peerNameFromSession(
   pid: number,
   opts: { titleSource?: string } = {}
 ): { name: string; rejected?: string } {
-  // Model-generated titles are never addresses: they express no user intent
-  // and the host rewrites them (replan refresh), so adopting one would flap
-  // the peer name mid-life. Fall back silently — no warning.
+  if (raw === undefined || raw === '') return { name: defaultPeerName(cwd, pid) };
+  if (isValidPeerName(raw)) return { name: raw };
+  if (raw === REFUSED_HOST_NAME) return { name: defaultPeerName(cwd, pid), rejected: raw };
+  const slug = slugifySessionTitle(raw);
+  if (slug !== undefined) return { name: slug };
   if (opts.titleSource === 'auto') return { name: defaultPeerName(cwd, pid) };
-  if (raw !== undefined && raw !== '' && PEER_NAME_PATTERN.test(raw) && raw !== REFUSED_HOST_NAME) {
-    return { name: raw };
-  }
-  return raw !== undefined && raw !== ''
-    ? { name: defaultPeerName(cwd, pid), rejected: raw }
-    : { name: defaultPeerName(cwd, pid) };
+  return { name: defaultPeerName(cwd, pid), rejected: raw };
 }
 
 export interface ResolveNameInput {

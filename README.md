@@ -15,7 +15,7 @@ peer_send to="backend" ...  injects a real prompt into that instance's agent
 You are `main-peer`. Do NOT message peers unless the user explicitly asks, or to reply to an inbound peer message.
 A peer is another live agent instance on this machine. Its messages reach you as user text starting with `[peer <name>]:` — that is the peer speaking, not your user.
 `peer_send` to="<name>" delivers a real prompt there; reply arrives here as a peer message. `peer_status` and `peer_request` are available agent tools.
-Names are session names (`/rename <name>`); valid 1-24 [a-zA-Z0-9_.-], else `<dir>-<pid>`. Auto-titles never qualify — `/rename` to claim an address.
+Names are session names (`/rename <name>`); valid 1-24 [a-zA-Z0-9_.-] used as-is, other titles (incl. auto-titles) slugged, e.g. `merge-reconcile-origin`; else `<dir>-<pid>`.
 
 - `test-peer` — omp(34532) in C:\work\any (idle)
 </peers>
@@ -109,7 +109,7 @@ Then restart omp. Verify with `/peers` — you should see yourself listed.
 | Command / tool | What it does |
 |---|---|
 | `/peers` | List live instances: name · harness(pid) · cwd · model · busy/idle · activity · todo count · beat age. `held N` in the header while batches wait on your composer. Interactive picker in the TUI when available. Always renders a fresh beat. |
-| `/rename <name>` | The host's builtin session rename. The peer name follows automatically. Valid peer addresses: 1–24 chars of `a-z A-Z 0-9 _ . -`; anything else (spaces, auto-generated titles) keeps the default `<dir>-<pid>` name. |
+| `/rename <name>` | The host's builtin session rename. The peer name follows automatically. Valid peer addresses (1–24 chars of `a-z A-Z 0-9 _ . -`) are used as-is; any other title, including omp 18.9 auto-generated title cards, is slugged (`🔀 MERGE: Reconcile origin master…` → `merge-reconcile-origin`). Only titles with no letters or digits keep the default `<dir>-<pid>` name. |
 | `peer_send` (agent tool) | `to` (peer name, from `/peers`), `message`, optional `replyTo`. Injects a real prompt into the peer: steers mid-turn, wakes when idle, holds while the peer is typing. Fire-and-forget — replies arrive as peer messages (`Held at <name> (typing)` while held). |
 | `peer_status` (agent tool) | `to` (peer name). Returns busy/idle, current activity, the peer's **native** todo list as a phase-grouped checklist (`[ ]` pending, `[~]` in progress, `[x]` completed, `[!]` blocked with its blocker, `[-]` abandoned), and last beat age. Use before pestering an agent. |
 | `peer_request` (agent tool) | `to`, `message`, `timeout_ms` (default 30000, clamped 5–120 s), optional `replyTo`. Sends a message and waits for a matching `peer_send` reply from the target. Returns `Reply from <to>: ...` or a timeout with a `peer_status` hint. |

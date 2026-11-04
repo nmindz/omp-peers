@@ -25,6 +25,7 @@ export {
   validatePeerName,
   defaultPeerName,
   peerNameFromSession,
+  slugifySessionTitle,
   resolvePeerName,
   type ResolveNameInput,
 } from './peers/ids.js';

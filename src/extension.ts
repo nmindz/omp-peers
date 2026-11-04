@@ -214,9 +214,7 @@ async function tick(st: NodeState): Promise<void> {
       sessionName = undefined;
     }
   }
-  // The host marks model-generated titles `"auto"`: those are never peer
-  // addresses (no user intent, rewritten on replan) — peerNameFromSession
-  // falls back to the default silently instead of warning.
+  // Raw valid names are used as-is; omp card titles (user or auto) are slugged.
   const derived = peerNameFromSession(sessionName, cwd, st.pid, {
     titleSource: readTitleSource(ctx?.sessionManager),
   });
@@ -677,9 +675,10 @@ export default function peersExtension(pi: ExtensionHostLike): void {
     } catch {
       sessionName = undefined;
     }
-    // Auto-titles never claim the peer name, even valid-looking ones: the
-    // host rewrites them, which would flap the address mid-life.
-    if (sessionName !== undefined && isValidPeerName(sessionName) && readTitleSource(ctx?.sessionManager) !== 'auto') {
+    const derived = peerNameFromSession(sessionName, cwd, st.pid, {
+      titleSource: readTitleSource(ctx?.sessionManager),
+    });
+    if (sessionName !== undefined && sessionName !== '' && derived.rejected === undefined) {
       const others = st.peers.filter((p) => p.pid !== st.pid);
       let localIds: string[] = [];
       if (BRIDGE !== undefined) {
@@ -690,7 +689,7 @@ export default function peersExtension(pi: ExtensionHostLike): void {
         }
       }
       st.name = resolvePeerName({
-        candidate: sessionName,
+        candidate: derived.name,
         pid: st.pid,
         startedAt: st.startedAt,
         peers: others,
