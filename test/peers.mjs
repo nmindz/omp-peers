@@ -159,7 +159,30 @@ describe('presence beat → roster lists both peers', () => {
       },
       now
     );
-    assert.match(text, /alpha · omp\(47111\) · \/w\/a · m1 · working · beat 3s ago · you/);
+    assert.match(text, /\na  alpha · omp\(47111\) · \/w\/a · m1 · working · beat 3s ago · you/);
+  });
+
+  it('sorts /peers by project, aligns names, clips long projects', () => {
+    const now = Date.now();
+    const rec = (pid, name, project) => ({
+      v: 1, pid, name, cwd: `/w/${project}`, project, harness: 'omp',
+      sessionId: 's', model: 'm', socket: 'x', startedAt: 1, beatAt: now, busy: false,
+    });
+    const text = formatPeersText(
+      {
+        ownName: 'x',
+        mode: 'tools',
+        peers: [rec(1, 'aaa', 'zeta'), rec(2, 'zzz', 'Alpha'), rec(3, 'bbb', 'alpha'), rec(4, 'ccc', 'terraform-spacelift-extra')],
+      },
+      now
+    );
+    const order = text.split('\n').slice(1).map((l) => l.split(' · ')[0]);
+    assert.deepEqual(order, [
+      'alpha                 bbb',
+      'Alpha                 zzz',
+      'terraform-spacelift-  ccc',
+      'zeta                  aaa',
+    ]);
   });
 
   it('surfaces held batches in the /peers header', () => {

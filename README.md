@@ -108,7 +108,7 @@ Then restart omp. Verify with `/peers` — you should see yourself listed.
 
 | Command / tool | What it does |
 |---|---|
-| `/peers` | List live instances: name · harness(pid) · cwd · model · busy/idle · activity · todo count · beat age. `held N` in the header while batches wait on your composer. Interactive picker in the TUI when available. Always renders a fresh beat. |
+| `/peers` | List live instances, sorted by project then name: project column (folder the session started in, clipped at 20 chars) · name · harness(pid) · cwd · model · busy/idle · activity · todo count · beat age. `held N` in the header while batches wait on your composer. Interactive picker in the TUI when available. Always renders a fresh beat. |
 | `/rename <name>` | The host's builtin session rename. The peer name follows automatically. Valid peer addresses (1–24 chars of `a-z A-Z 0-9 _ . -`) are used as-is; any other title, including omp 18.9 auto-generated title cards, is slugged (`🔀 MERGE: Reconcile origin master…` → `merge-reconcile-origin`). Only titles with no letters or digits keep the default `<dir>-<pid>` name. |
 | `peer_send` (agent tool) | `to` (peer name, from `/peers`), `message`, optional `replyTo`. Injects a real prompt into the peer: steers mid-turn, wakes when idle, holds while the peer is typing. Fire-and-forget — replies arrive as peer messages (`Held at <name> (typing)` while held). |
 | `peer_status` (agent tool) | `to` (peer name). Returns busy/idle, current activity, the peer's **native** todo list as a phase-grouped checklist (`[ ]` pending, `[~]` in progress, `[x]` completed, `[!]` blocked with its blocker, `[-]` abandoned), and last beat age. Use before pestering an agent. |
