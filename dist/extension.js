@@ -36,11 +36,18 @@ const MODE = probe.kind === 'hub-bridge' ? 'hub' : 'tools';
 const BRIDGE = probe.kind === 'hub-bridge' ? probe.bridge : undefined;
 /** How long a started tool keeps naming the peer's activity before busy/idle takes over. */
 const ACTIVITY_FRESH_MS = 120_000;
-/** One node per process, even when several sessions load the extension. */
-let node;
+/**
+ * One node per process, even when several sessions load the extension. omp
+ * imports extensions with a cache-busting query per session, so module scope
+ * is per copy — the node lives on globalThis instead.
+ */
+const NODE_SLOT = Symbol.for('omp-peers.node');
+const slot = (globalThis[NODE_SLOT] ??= {
+    node: undefined,
+});
 /** The live node for this process, if one is running. */
 function liveNode() {
-    return node !== undefined && !node.stopped ? node : undefined;
+    return slot.node !== undefined && !slot.node.stopped ? slot.node : undefined;
 }
 function currentOf() {
     return liveNode()?.current;
@@ -65,10 +72,10 @@ function holdBatch(st, msg) {
 }
 /** Retry held batches oldest-first; drop each once it delivers or ages out. */
 async function pumpHeld(st) {
-    if (st.stopped || node !== st)
+    if (st.stopped || slot.node !== st)
         return;
     for (const batch of [...st.held]) {
-        if (st.stopped || node !== st)
+        if (st.stopped || slot.node !== st)
             return;
         const res = await deliverInboundPeerMessage(batch.message, {
             getCurrent: () => currentOf(),
@@ -340,7 +347,7 @@ function ensureNode(pi, ctx) {
             pendingReplies: new Map(),
         };
         st.name = defaultPeerName(typeof ctx.cwd === 'string' && ctx.cwd !== '' ? ctx.cwd : process.cwd(), st.pid);
-        node = st;
+        slot.node = st;
         void ensureStateDirs(stateDir)
             .then(() => {
             if (st.stopped)
@@ -405,7 +412,7 @@ function ensureNode(pi, ctx) {
         return st;
     }
     catch (err) {
-        node = undefined;
+        slot.node = undefined;
         try {
             pi.logger?.warn(`peers: could not start (${String(err)})`);
         }
@@ -540,21 +547,25 @@ export default function peersExtension(pi) {
         },
         getPendingReplies: () => liveNode()?.pendingReplies,
     });
-    pi.on('session_start', (_event, ctx) => {
+    // Task subagents share the parent's pid; only the parent session drives the node.
+    const on = (event, handler) => {
+        pi.on(event, (payload, ctx) => (ctx?.agent?.kind === 'sub' ? undefined : handler(payload, ctx)));
+    };
+    on('session_start', (_event, ctx) => {
         ensureNode(pi, ctx);
     });
-    pi.on('session_shutdown', () => {
-        const st = node;
-        node = undefined;
+    on('session_shutdown', () => {
+        const st = slot.node;
+        slot.node = undefined;
         if (st !== undefined)
             void stopNode(st);
     });
     for (const event of ['session_switch', 'session_branch', 'session_tree']) {
-        pi.on(event, (_payload, ctx) => {
+        on(event, (_payload, ctx) => {
             ensureNode(pi, ctx);
         });
     }
-    pi.on('input', (event) => {
+    on('input', (event) => {
         const source = event?.source;
         if (source === 'extension')
             return;
@@ -573,7 +584,7 @@ export default function peersExtension(pi) {
     // forever. Peer injections are identified by the `[peer <name>]` prefix
     // formatPeerText stamps on every delivery; a human prompt that happens to
     // start with `[peer ` won't reset — conservative direction, acceptable.
-    pi.on('before_agent_start', (event) => {
+    on('before_agent_start', (event) => {
         const prompt = event?.prompt;
         if (typeof prompt === 'string' && prompt.startsWith('[peer '))
             return;
@@ -586,7 +597,7 @@ export default function peersExtension(pi) {
     // Activity is never synchronous on ctx, so it is captured from the agent's
     // own tool events: a started tool names what the peer is doing right now,
     // and its end clears the name (busy/idle still describes the turn).
-    pi.on('tool_execution_start', (event) => {
+    on('tool_execution_start', (event) => {
         const st = liveNode();
         if (st === undefined)
             return;
@@ -598,7 +609,7 @@ export default function peersExtension(pi) {
             return;
         st.nativeActivity = { text, at: Date.now() };
     });
-    pi.on('tool_execution_end', (event) => {
+    on('tool_execution_end', (event) => {
         const st = liveNode();
         if (st !== undefined) {
             st.nativeActivity = undefined;
@@ -608,20 +619,20 @@ export default function peersExtension(pi) {
             }
         }
     });
-    pi.on('agent_end', () => {
+    on('agent_end', () => {
         const st = liveNode();
         if (st !== undefined)
             st.nativeActivity = undefined;
     });
     // The reminder fires after the turn's todos came back unfinished; the beat
     // that follows must carry the fresh phases.
-    pi.on('todo_reminder', () => {
+    on('todo_reminder', () => {
         const st = liveNode();
         if (st === undefined)
             return;
         void tick(st).catch((err) => logOf(st, `peers: tick failed: ${err instanceof Error ? err.message : String(err)}`));
     });
-    pi.on('context', (event, ctx) => {
+    on('context', (event, ctx) => {
         const st = ensureNode(pi, ctx);
         if (st === undefined)
             return undefined;

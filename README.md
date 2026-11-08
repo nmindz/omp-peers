@@ -133,7 +133,7 @@ Agents reply with `peer_send` too — every delivered message carries the exact 
 ## How it works
 
 - **Presence**: each instance writes one owner-only file (`<pid>.json`) to a machine-global state dir, refreshed every 15 s with a 45 s liveness TTL. Liveness = `process.kill(pid, 0)` + fresh beat; crashed instances are reaped on sight. All registry writes are sidecar-write + `fsync` + `copyFile` — never `rename` over a live file (the Windows EPERM failure mode).
-- **Transport**: newline-delimited JSON over a per-pid named pipe (`\\.\pipe\peers-<pid>` on Windows) or unix socket elsewhere.
+- **Transport**: newline-delimited JSON over a per-pid named pipe (`\\.\pipe\peers-<pid>` on Windows) or unix socket elsewhere. One server per process: omp loads a fresh module copy for every session (task subagents included, all in the parent's pid), so the node lives on `globalThis` and sessions whose `ctx.agent.kind` is `sub` never start, beat, or tear it down.
 - **Delivery**: inbound messages are delivered through the host's own session API (`pi.sendUserMessage` on the live context) — steer if busy, real turn if idle. The extension never imports host singleton modules (dynamic imports can bind a foreign module copy on compiled binaries) and never snapshots the session object (stale sessions are the classic way plugins "deliver" into the void).
 
 State dir: `%LOCALAPPDATA%\omp-peers\` (Windows), `~/.omp/var/omp-peers/` elsewhere; override with `OMP_PEERS_DIR`. Presence files are ephemeral — deleting the dir is safe.

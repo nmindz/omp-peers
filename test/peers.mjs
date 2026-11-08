@@ -797,6 +797,60 @@ describe('peer name follows the host session name (tick level)', () => {
   });
 });
 
+describe('subagent sessions never own the process node', () => {
+  function fakeHost(sessionName) {
+    const handlers = {};
+    return {
+      handlers,
+      pi: {
+        registerCommand: () => {},
+        registerTool: () => {},
+        on: (event, handler) => { handlers[event] = handler; },
+        logger: { warn: () => {}, info: () => {}, error: () => {} },
+        getSessionName: () => sessionName,
+      },
+    };
+  }
+  const noted = [];
+  const ctxFor = (kind) => ({
+    cwd: join(STATE, 'subproj'),
+    ui: { notify: (message) => noted.push(message) },
+    sessionManager: { getSessionId: () => `sess-${kind}` },
+    agent: { kind, depth: kind === 'sub' ? 1 : 0 },
+  });
+
+  it('a subagent module copy neither binds nor unlinks the parent socket', async () => {
+    // omp imports extensions with a cache-busting query per session, so a
+    // subagent runs its own module copy inside the parent process.
+    const main = fakeHost('main-peer');
+    const sub = fakeHost('sub-peer');
+    (await import('../dist/extension.js?copy=main')).default(main.pi);
+    (await import('../dist/extension.js?copy=sub')).default(sub.pi);
+    const ping = () => requestPeer(peerSocketAddress(STATE, process.pid), { t: 'ping' }, 1000);
+    const ownRecord = async () =>
+      (await listLivePeers(STATE, 0, { isAlive: ALIVE })).find((p) => p.pid === process.pid);
+
+    main.handlers['session_start'](undefined, ctxFor('main'));
+    for (let i = 0; i < 100 && (await ownRecord())?.name !== 'main-peer'; i += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+    assert.equal((await ping())?.name, 'main-peer');
+
+    sub.handlers['session_start'](undefined, ctxFor('sub'));
+    sub.handlers['context']({ messages: [] }, ctxFor('sub'));
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    assert.equal((await ownRecord())?.name, 'main-peer', 'subagent must not re-beat the parent record');
+
+    sub.handlers['session_shutdown'](undefined, ctxFor('sub'));
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    assert.ok(!noted.some((m) => /EADDRINUSE|server error/.test(m)), noted.join('\n'));
+    assert.equal((await ping())?.name, 'main-peer', 'parent socket survives subagent shutdown');
+    assert.equal((await ownRecord())?.name, 'main-peer', 'parent record survives subagent shutdown');
+
+    main.handlers['session_shutdown'](undefined, ctxFor('main'));
+  });
+});
+
 describe('peer_send registration is mode-independent', () => {
   function fakePi(sendImpl) {
     const tools = {};

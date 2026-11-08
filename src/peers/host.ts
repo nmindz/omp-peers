@@ -52,6 +52,8 @@ export interface CommandContextLike {
   isIdle: () => boolean;
   setInterval?: (callback: () => void, ms?: number) => unknown;
   clearTimer?: (timer: unknown) => void;
+  /** omp runner identity; `kind: 'sub'` marks a task subagent session. */
+  agent?: { kind?: unknown };
   [key: string]: unknown;
 }
 
